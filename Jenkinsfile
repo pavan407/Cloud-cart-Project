@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_USER = 'pavan014'
+        DOCKERHUB_USER = 'pavan404'
         IMAGE_NAME = 'cloudcart'
         IMAGE_TAG = 'MD'
         FULL_IMAGE_NAME = "${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}"
