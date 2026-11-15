@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: cloudcart-replicaset
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudcart
+  template:
+    metadata:
+      labels:
+        app: cloudcart
+    spec:
+      containers:
+        - name: cloudcart
+          image: pavan404/cloudcart:MD
+          ports:
+            - containerPort: 8000
