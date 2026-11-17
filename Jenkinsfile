@@ -57,13 +57,24 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                echo 'Deploying Cloud-cart to Kubernetes'
+                echo 'Deploying Cloud-cart to MicroK8s'
 
-                withKubeConfig(credentialsId: 'kubernetes-credentials') {
+                withKubeConfig(credentialsId: 'microk8s-kubeconfig') {
                     sh '''
-                        echo "Checking Kubernetes connection"
+                        echo "Checking Kubernetes API server"
 
-                        kubectl cluster-info
+                        kubectl config view --minify \
+                          -o jsonpath='{.clusters[0].cluster.server}'
+
+                        echo ""
+
+                        echo "Testing Kubernetes API authentication"
+
+                        kubectl get --raw=/version
+
+                        echo "Checking Kubernetes nodes"
+
+                        kubectl get nodes
 
                         echo "Applying Kubernetes Deployment"
 
@@ -75,7 +86,8 @@ pipeline {
 
                         echo "Waiting for deployment"
 
-                        kubectl rollout status deployment/cloudcart-deployment --timeout=180s
+                        kubectl rollout status deployment/cloudcart-deployment \
+                          --timeout=180s
 
                         echo "Checking Kubernetes resources"
 
