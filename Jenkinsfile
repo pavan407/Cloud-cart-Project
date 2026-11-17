@@ -10,7 +10,6 @@ pipeline {
 
     stages {
 
-        // Stage 1: Code Cloning
         stage('Code Cloning') {
             steps {
                 echo 'Cloning the code'
@@ -20,10 +19,9 @@ pipeline {
             }
         }
 
-        // Stage 2: Build Docker Image
         stage('Build Docker Image') {
             steps {
-                echo 'Building the Docker image'
+                echo 'Building Docker image'
 
                 sh '''
                     docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
@@ -31,28 +29,21 @@ pipeline {
             }
         }
 
-        // Stage 3: Tag Docker Image
         stage('Tag Docker Image') {
             steps {
-                echo 'Tagging the Docker image'
-
                 sh '''
                     docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${FULL_IMAGE_NAME}
                 '''
             }
         }
 
-        // Stage 4: Push Docker Image
         stage('Push Docker Image') {
             steps {
-                echo 'Pushing Docker image to Docker Hub'
-
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-credentials',
                     usernameVariable: 'DOCKERHUB_CREDENTIAL_USER',
                     passwordVariable: 'DOCKERHUB_PASS'
                 )]) {
-
                     sh '''
                         echo "$DOCKERHUB_PASS" | docker login \
                             -u "$DOCKERHUB_CREDENTIAL_USER" \
@@ -64,54 +55,30 @@ pipeline {
             }
         }
 
-        // Stage 5: Deploy Kubernetes Deployment
         stage('Deploy to Kubernetes') {
             steps {
-                echo 'Deploying application using Kubernetes Deployment'
+                echo 'Deploying Cloud-cart to Kubernetes'
 
                 withKubeConfig(credentialsId: 'kubeconfig') {
                     sh '''
+                        echo "Checking Kubernetes connection"
+
+                        kubectl cluster-info
+
+                        echo "Applying Kubernetes Deployment"
+
                         kubectl apply -f k8s/deployment.yaml
 
-                        kubectl rollout status deployment/cloudcart-deployment
-                    '''
-                }
-            }
-        }
+                        echo "Applying Kubernetes Service"
 
-        // Stage 6: Create ReplicaSet
-        stage('Create ReplicaSet') {
-            steps {
-                echo 'Applying Kubernetes ReplicaSet'
-
-                withKubeConfig(credentialsId: 'kubeconfig') {
-                    sh '''
-                        kubectl apply -f k8s/replicaset.yaml
-                    '''
-                }
-            }
-        }
-
-        // Stage 7: Create Kubernetes Service
-        stage('Create Kubernetes Service') {
-            steps {
-                echo 'Creating Kubernetes Service'
-
-                withKubeConfig(credentialsId: 'kubeconfig') {
-                    sh '''
                         kubectl apply -f k8s/service.yaml
-                    '''
-                }
-            }
-        }
 
-        // Stage 8: Verify Kubernetes Resources
-        stage('Verify Deployment') {
-            steps {
-                echo 'Checking Kubernetes resources'
+                        echo "Waiting for deployment"
 
-                withKubeConfig(credentialsId: 'kubeconfig') {
-                    sh '''
+                        kubectl rollout status deployment/cloudcart-deployment --timeout=180s
+
+                        echo "Checking Kubernetes resources"
+
                         kubectl get deployments
                         kubectl get replicasets
                         kubectl get pods
