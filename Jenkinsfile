@@ -2,20 +2,31 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_USER = 'pavan404'
+        DOCKER_USER = 'pavan404'
         IMAGE_NAME = 'cloudcart'
         IMAGE_TAG = 'MD'
-        FULL_IMAGE_NAME = "${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}"
+        DOCKER_IMAGE = 'pavan404/cloudcart:MD'
+        KUBECONFIG = '/var/lib/jenkins/.kube/config'
     }
 
     stages {
 
+        stage('Code Checkout') {
+            steps {
+                echo 'Checking out source code from GitHub'
+
+                checkout scm
+            }
+        }
+
         stage('Code Cloning') {
             steps {
-                echo 'Cloning the code'
+                echo 'Source code cloned successfully'
 
-                git branch: 'main',
-                    url: 'https://github.com/pavan407/Cloud-cart-Project.git'
+                sh '''
+                    pwd
+                    ls -la
+                '''
             }
         }
 
@@ -24,32 +35,37 @@ pipeline {
                 echo 'Building Docker image'
 
                 sh '''
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                    docker build -t cloudcart:MD .
                 '''
             }
         }
 
         stage('Tag Docker Image') {
             steps {
+                echo 'Tagging Docker image'
+
                 sh '''
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${FULL_IMAGE_NAME}
+                    docker tag cloudcart:MD pavan404/cloudcart:MD
                 '''
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials',
-                    usernameVariable: 'DOCKERHUB_CREDENTIAL_USER',
-                    passwordVariable: 'DOCKERHUB_PASS'
-                )]) {
+                echo 'Pushing Docker image to Docker Hub'
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKERHUB_USER',
+                        passwordVariable: 'DOCKERHUB_PASS'
+                    )
+                ]) {
                     sh '''
                         echo "$DOCKERHUB_PASS" | docker login \
-                            -u "$DOCKERHUB_CREDENTIAL_USER" \
-                            --password-stdin
+                        -u "$DOCKERHUB_USER" --password-stdin
 
-                        docker push ${FULL_IMAGE_NAME}
+                        docker push pavan404/cloudcart:MD
                     '''
                 }
             }
@@ -59,44 +75,38 @@ pipeline {
             steps {
                 echo 'Deploying Cloud-cart to MicroK8s'
 
-                withKubeConfig(credentialsId: 'microk8s-kubeconfig') {
-                    sh '''
-                        echo "Checking Kubernetes API server"
+                sh '''
+                    set -e
 
-                        kubectl config view --minify \
-                          -o jsonpath='{.clusters[0].cluster.server}'
+                    echo "Checking kubeconfig"
 
-                        echo ""
+                    test -s "$KUBECONFIG"
 
-                        echo "Testing Kubernetes API authentication"
+                    echo "Checking Kubernetes context"
 
-                        kubectl get --raw=/version
+                    kubectl config current-context
 
-                        echo "Checking Kubernetes nodes"
+                    echo "Checking Kubernetes nodes"
 
-                        kubectl get nodes
+                    kubectl get nodes
 
-                        echo "Applying Kubernetes Deployment"
+                    echo "Deploying application"
 
-                        kubectl apply -f k8s/deployment.yaml
+                    kubectl apply -f deployment.yaml
 
-                        echo "Applying Kubernetes Service"
+                    echo "Checking deployment"
 
-                        kubectl apply -f k8s/service.yaml
+                    kubectl rollout status deployment/cloudcart \
+                    --timeout=180s
 
-                        echo "Waiting for deployment"
+                    echo "Checking pods"
 
-                        kubectl rollout status deployment/cloudcart-deployment \
-                          --timeout=180s
+                    kubectl get pods -o wide
 
-                        echo "Checking Kubernetes resources"
+                    echo "Checking services"
 
-                        kubectl get deployments
-                        kubectl get replicasets
-                        kubectl get pods
-                        kubectl get services
-                    '''
-                }
+                    kubectl get svc
+                '''
             }
         }
     }
