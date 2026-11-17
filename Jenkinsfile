@@ -59,7 +59,7 @@ pipeline {
             steps {
                 echo 'Deploying Cloud-cart to Kubernetes'
 
-                withKubeConfig(credentialsId: 'kubeconfig') {
+                withKubeConfig(credentialsId: 'kubernetes-credentials') {
                     sh '''
                         echo "Checking Kubernetes connection"
 
